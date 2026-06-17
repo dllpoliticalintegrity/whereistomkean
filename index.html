@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Where is Tom Kean?</title>
+    <meta
+      name="description"
+      content="Rep. Tom Kean Jr. (NJ-07) has gone missing from his constituents. A live counter — and a running list of every stock trade he's still finding time to make."
+    />
+    <link rel="canonical" href="https://whereistomkean.org/" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕵️</text></svg>" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Where is Tom Kean?" />
+    <meta property="og:url" content="https://whereistomkean.org/" />
+    <meta property="og:title" content="Where is Tom Kean?" />
+    <meta
+      property="og:description"
+      content="Rep. Tom Kean Jr. (NJ-07) has gone missing from his constituents. A live counter — and a running list of every stock trade he's still finding time to make."
+    />
+    <meta property="og:image" content="https://whereistomkean.org/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Where is Tom Kean? Missing person report." />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Where is Tom Kean?" />
+    <meta
+      name="twitter:description"
+      content="Rep. Tom Kean Jr. (NJ-07) has gone missing from his constituents. A live counter — and a running list of every stock trade he's still finding time to make."
+    />
+    <meta name="twitter:image" content="https://whereistomkean.org/og-image.png" />
+
+    <!-- Structured data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Where is Tom Kean?",
+        "url": "https://whereistomkean.org/",
+        "description": "A live counter and running record of Rep. Tom Kean Jr.'s (NJ-07) disclosed stock trades while absent from his constituents."
+      }
+    </script>
+
+    <style>
+      :root {
+        --bg: #08090b;
+        --bg-elev: #111317;
+        --border: #23262d;
+        --fg: #f4f4f5;
+        --muted: #9aa0aa;
+        --amber: #f59e0b;
+        --amber-dim: rgba(245, 158, 11, 0.12);
+        --green: #4ade80;
+        --red: #f87171;
+        --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body { margin: 0; padding: 0; }
+
+      body {
+        background:
+          radial-gradient(1200px 600px at 50% -10%, rgba(245, 158, 11, 0.08), transparent 60%),
+          var(--bg);
+        color: var(--fg);
+        font-family: var(--sans);
+        -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+      }
+
+      a { color: inherit; }
+
+      .wrap {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 48px 20px 96px;
+      }
+
+      /* ---------- Hero ---------- */
+      .hero { text-align: center; }
+
+      .eyebrow {
+        font-family: var(--mono);
+        text-transform: uppercase;
+        letter-spacing: 0.28em;
+        font-size: 12px;
+        color: var(--amber);
+        margin: 0 0 18px;
+      }
+
+      h1 {
+        font-size: clamp(40px, 9vw, 84px);
+        line-height: 0.98;
+        margin: 0;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+      h1 .q { color: var(--amber); }
+
+      .subhead {
+        color: var(--muted);
+        font-size: clamp(15px, 2.4vw, 19px);
+        max-width: 620px;
+        margin: 20px auto 0;
+        line-height: 1.55;
+      }
+
+      /* ---------- Counter ---------- */
+      .counter-label {
+        font-family: var(--mono);
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        font-size: 12px;
+        color: var(--muted);
+        margin: 48px 0 16px;
+        text-align: center;
+      }
+
+      .counter {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        max-width: 560px;
+        margin: 0 auto;
+      }
+
+      .cell {
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 22px 8px 14px;
+        position: relative;
+        overflow: hidden;
+      }
+      .cell::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, var(--amber), transparent);
+        opacity: 0.5;
+      }
+
+      .cell .num {
+        font-family: var(--mono);
+        font-size: clamp(30px, 8vw, 52px);
+        font-weight: 700;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
+      }
+      .cell .unit {
+        display: block;
+        margin-top: 10px;
+        font-family: var(--mono);
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-size: 10px;
+        color: var(--muted);
+      }
+
+      /* ---------- Trades ---------- */
+      .trades { margin-top: 72px; }
+
+      .who {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 16px;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        margin-bottom: 22px;
+      }
+      .who img {
+        width: 64px; height: 64px;
+        border-radius: 12px;
+        object-fit: cover;
+        background: #1b1e24;
+        flex: 0 0 auto;
+      }
+      .who .name { font-size: 20px; font-weight: 700; margin: 0; }
+      .who .meta { color: var(--muted); font-size: 13px; margin: 4px 0 0; font-family: var(--mono); }
+      .who .rep {
+        margin-left: auto;
+        text-align: right;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--amber);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+      .who .rep b { display: block; font-size: 22px; color: var(--fg); letter-spacing: 0; }
+
+      .section-title {
+        font-size: 14px;
+        font-family: var(--mono);
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        color: var(--muted);
+        margin: 0 0 14px;
+      }
+
+      .trade {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 14px;
+        padding: 13px 16px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--bg-elev);
+        margin-bottom: 8px;
+      }
+      .trade .side {
+        font-family: var(--mono);
+        font-weight: 700;
+        font-size: 13px;
+        width: 56px;
+        text-align: center;
+        border-radius: 7px;
+        padding: 5px 0;
+      }
+      .side.buy { color: var(--green); background: rgba(74, 222, 128, 0.1); }
+      .side.sell { color: var(--red); background: rgba(248, 113, 113, 0.1); }
+
+      .trade .ticker { font-family: var(--mono); font-weight: 700; font-size: 16px; }
+      .trade .date { color: var(--muted); font-size: 12px; font-family: var(--mono); margin-top: 2px; }
+
+      .trade .right { text-align: right; }
+      .trade .amount { font-family: var(--mono); font-weight: 600; color: var(--amber); font-size: 15px; }
+      .trade .ret { font-family: var(--mono); font-size: 12px; margin-top: 2px; }
+      .ret.up { color: var(--green); }
+      .ret.down { color: var(--red); }
+      .ret.flat { color: var(--muted); }
+
+      .state { text-align: center; color: var(--muted); padding: 40px 0; font-family: var(--mono); font-size: 14px; }
+      .state.error { color: var(--red); }
+
+      footer {
+        margin-top: 64px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.7;
+      }
+      footer a { color: var(--amber); text-decoration: none; }
+      footer a:hover { text-decoration: underline; }
+
+      @media (max-width: 560px) {
+        .cell .unit { letter-spacing: 0.1em; }
+        .who .rep { display: none; }
+        .trade { grid-template-columns: auto 1fr auto; gap: 10px; padding: 11px 13px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="hero">
+        <p class="eyebrow">Missing Person Report</p>
+        <h1>Where is <span class="q">Tom Kean?</span></h1>
+        <p class="subhead">
+          Rep. Thomas Kean Jr. (NJ&#8209;07) hasn't been seen facing his
+          constituents at an in-person town hall. Last confirmed sighting:
+          <strong>March 5, 2025</strong>. He has now been missing for:
+        </p>
+
+        <p class="counter-label">Time since last sighting</p>
+        <div class="counter" id="counter" aria-live="polite">
+          <div class="cell"><span class="num" id="d">--</span><span class="unit">Days</span></div>
+          <div class="cell"><span class="num" id="h">--</span><span class="unit">Hours</span></div>
+          <div class="cell"><span class="num" id="m">--</span><span class="unit">Minutes</span></div>
+          <div class="cell"><span class="num" id="s">--</span><span class="unit">Seconds</span></div>
+        </div>
+      </section>
+
+      <section class="trades">
+        <div class="who" id="who" hidden>
+          <img id="who-photo" alt="" />
+          <div>
+            <p class="name" id="who-name">Thomas Kean Jr.</p>
+            <p class="meta" id="who-meta">Republican · New Jersey</p>
+          </div>
+          <div class="rep">District<b id="who-rep">NJ-07</b></div>
+        </div>
+
+        <p class="section-title">He's not too busy to trade stocks</p>
+        <div id="trades-list">
+          <div class="state" id="trades-state">Loading trades…</div>
+        </div>
+      </section>
+
+      <footer>
+        <p>
+          Data from the
+          <a href="https://integrityindex.us/candidate/thomas-kean" target="_blank" rel="noopener">Integrity Index</a>
+          congressional trading database. Trades are self-reported under the STOCK Act.<br />
+          Not affiliated with or authorized by any candidate or committee.
+        </p>
+      </footer>
+    </main>
+
+    <script type="module">
+      import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+      /* ----------------------------------------------------------------
+       * Config — edit these to repoint the site.
+       * The anon key is a public, browser-safe key (Row Level Security
+       * protects the database); it is intentionally embedded.
+       * ---------------------------------------------------------------- */
+      const SUPABASE_URL = "https://qjsesvdduoriofiodumm.supabase.co";
+      const SUPABASE_ANON_KEY =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqc2VzdmRkdW9yaW9maW9kdW1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2OTU3OTksImV4cCI6MjA3NjI3MTc5OX0.ny5M7Z0yMlw0K1LWyKfSEde4VFjAdJmimTh2YHxl-3s";
+
+      // Tom Kean's last confirmed in-person town hall (US Eastern).
+      const MISSING_SINCE = new Date("2025-03-05T00:00:00-05:00");
+
+      // Who we're tracking.
+      const CANDIDATE_SLUG = "thomas-kean";
+      const CANDIDATE_BIOGUIDE = "K000398";
+
+      /* ---------------- Live counter ---------------- */
+      const pad = (n) => String(n).padStart(2, "0");
+      const el = { d: document.getElementById("d"), h: document.getElementById("h"), m: document.getElementById("m"), s: document.getElementById("s") };
+
+      function tick() {
+        let diff = Math.max(0, Date.now() - MISSING_SINCE.getTime());
+        const days = Math.floor(diff / 86400000); diff -= days * 86400000;
+        const hours = Math.floor(diff / 3600000); diff -= hours * 3600000;
+        const mins = Math.floor(diff / 60000); diff -= mins * 60000;
+        const secs = Math.floor(diff / 1000);
+        el.d.textContent = days.toLocaleString();
+        el.h.textContent = pad(hours);
+        el.m.textContent = pad(mins);
+        el.s.textContent = pad(secs);
+      }
+      tick();
+      setInterval(tick, 1000);
+
+      /* ---------------- Trade amount formatting ----------------
+       * Ported from src/lib/tradeAmountUtils.ts. The DB stores either a
+       * range string ("$1,001 - $15,000") or the bucket minimum ("1001.0").
+       */
+      const AMOUNT_BUCKETS = [
+        [0, 1000], [1001, 15000], [15001, 50000], [50001, 100000],
+        [100001, 250000], [250001, 500000], [500001, 1000000],
+        [1000001, 5000000], [5000001, 25000000], [25000001, 50000000],
+      ];
+
+      function amountMidpoint(raw) {
+        if (!raw) return 0;
+        const value = String(raw).trim();
+        const numeric = Number(value);
+        if (Number.isFinite(numeric)) {
+          for (let i = 0; i < AMOUNT_BUCKETS.length; i++) {
+            const [min, max] = AMOUNT_BUCKETS[i];
+            const next = AMOUNT_BUCKETS[i + 1];
+            if (numeric >= min && (!next || numeric < next[0])) return (min + max) / 2;
+          }
+          return numeric;
+        }
+        const range = value.match(/\$?([\d,]+(?:\.\d+)?)\s*[-–—]\s*\$?([\d,]+(?:\.\d+)?)/);
+        if (range) {
+          const lo = Number(range[1].replace(/,/g, ""));
+          const hi = Number(range[2].replace(/,/g, ""));
+          if (Number.isFinite(lo) && Number.isFinite(hi)) return (lo + hi) / 2;
+        }
+        const over = value.match(/over\s+\$?([\d,]+(?:\.\d+)?)/i);
+        if (over) {
+          const n = Number(over[1].replace(/,/g, ""));
+          if (Number.isFinite(n)) return n;
+        }
+        return 0;
+      }
+
+      function formatAmount(raw) {
+        const avg = amountMidpoint(raw);
+        if (avg >= 1000000) return `$${(avg / 1000000).toFixed(1)}M`;
+        if (avg >= 1000) return `$${(avg / 1000).toFixed(0)}K`;
+        if (avg > 0) return `$${Math.round(avg)}`;
+        return "";
+      }
+
+      const isBuy = (type) => {
+        if (!type) return true;
+        const t = type.toLowerCase();
+        return t.includes("purchase") || t.includes("buy");
+      };
+
+      const fmtDate = (d) =>
+        new Date(d + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+
+      /* ---------------- Data load ---------------- */
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const listEl = document.getElementById("trades-list");
+      const stateEl = document.getElementById("trades-state");
+
+      function setState(msg, isError) {
+        listEl.innerHTML = `<div class="state${isError ? " error" : ""}">${msg}</div>`;
+      }
+
+      async function load() {
+        try {
+          // Resolve the candidate (photo, name, district) for the header.
+          const { data: cand } = await supabase
+            .from("candidates")
+            .select("name, party, state, district, bioguide_id, photo_url_large")
+            .eq("slug", CANDIDATE_SLUG)
+            .maybeSingle();
+
+          const bioguide = cand?.bioguide_id || CANDIDATE_BIOGUIDE;
+
+          if (cand) {
+            const who = document.getElementById("who");
+            const photo = document.getElementById("who-photo");
+            if (cand.photo_url_large) { photo.src = cand.photo_url_large; photo.alt = cand.name; }
+            else photo.remove();
+            document.getElementById("who-name").textContent = cand.name;
+            document.getElementById("who-meta").textContent = `${cand.party} · ${cand.state}`;
+            const st = (cand.state || "").split(" ").map((w) => w[0]).join("").toUpperCase();
+            document.getElementById("who-rep").textContent = cand.district ? `${st}-${String(cand.district).padStart(2, "0")}` : st;
+            who.hidden = false;
+          }
+
+          // Pull every trade, newest first.
+          const { data: trades, error } = await supabase
+            .from("congress_trades")
+            .select("id, ticker, amount, transaction_type, transaction_date, ret_since")
+            .eq("bioguide_id", bioguide)
+            .order("transaction_date", { ascending: false })
+            .limit(200);
+
+          if (error) throw error;
+          if (!trades || trades.length === 0) {
+            setState("No disclosed trades found.");
+            return;
+          }
+
+          // Collapse near-duplicate disclosure rows (same trade stored once as a
+          // numeric bucket-min and once as a range string).
+          const seen = new Set();
+          const rows = [];
+          for (const t of trades) {
+            const key = `${t.ticker}|${t.transaction_date}|${t.transaction_type}|${formatAmount(t.amount)}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            rows.push(t);
+          }
+
+          listEl.innerHTML = rows.map(renderTrade).join("");
+        } catch (e) {
+          console.error(e);
+          setState("Couldn't load trades right now. Please try again later.", true);
+        }
+      }
+
+      function renderTrade(t) {
+        const buy = isBuy(t.transaction_type);
+        const amount = formatAmount(t.amount);
+        const ret = t.ret_since != null ? Number(t.ret_since) : null;
+        const retClass = ret == null ? "" : ret > 0 ? "up" : ret < 0 ? "down" : "flat";
+        const retText = ret == null ? "" : `${ret > 0 ? "+" : ""}${ret.toFixed(1)}%`;
+        return `
+          <div class="trade">
+            <span class="side ${buy ? "buy" : "sell"}">${buy ? "BUY" : "SELL"}</span>
+            <div>
+              <div class="ticker">${t.ticker || "—"}</div>
+              <div class="date">${fmtDate(t.transaction_date)}</div>
+            </div>
+            <div class="right">
+              ${amount ? `<div class="amount">${amount}</div>` : ""}
+              ${retText ? `<div class="ret ${retClass}">${retText} since</div>` : ""}
+            </div>
+          </div>`;
+      }
+
+      load();
+    </script>
+  </body>
+</html>
