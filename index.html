@@ -504,6 +504,42 @@
         padding-top: 16px;
         border-top: 1px solid var(--hair);
       }
+      .modal-alt {
+        margin-top: 18px;
+        padding-top: 16px;
+        border-top: 1px solid var(--hair);
+        text-align: center;
+      }
+      .modal-alt-or {
+        display: block;
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 12px;
+      }
+      .modal-alt-btn {
+        display: block;
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 18px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        text-decoration: none;
+        color: var(--ink);
+        background: var(--sheet);
+        border: 2px solid var(--ink);
+        padding: 12px 18px;
+      }
+      .modal-alt-btn:hover { background: var(--ink); color: var(--sheet); }
+      .modal-alt-sub {
+        display: block;
+        margin-top: 10px;
+        font-size: 13.5px;
+        line-height: 1.5;
+        color: var(--soft-ink);
+      }
 
       /* ---------- Print ---------- */
       @media print {
@@ -639,6 +675,13 @@
         </p>
         <div class="modal-embed">
           <givebutter-widget id="gVA39L"></givebutter-widget>
+        </div>
+        <div class="modal-alt">
+          <span class="modal-alt-or">or</span>
+          <a class="modal-alt-btn" href="https://thedonorstrike.com" target="_blank" rel="noopener">
+            Join The Donor Strike
+          </a>
+          <span class="modal-alt-sub">Help us get money out of politics.</span>
         </div>
       </div>
     </div>
