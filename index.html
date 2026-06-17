@@ -563,6 +563,8 @@
 
       // Tom Kean's last confirmed in-person town hall (US Eastern).
       const MISSING_SINCE = new Date("2026-03-05T00:00:00-05:00");
+      // Only trades disclosed on or after this date are listed (ISO yyyy-mm-dd).
+      const MISSING_SINCE_DATE = "2026-03-05";
 
       // Who we're tracking.
       const CANDIDATE_SLUG = "thomas-kean";
@@ -795,17 +797,18 @@
             contacts.innerHTML = links.join("");
           }
 
-          // Pull every trade, newest first.
+          // Pull trades disclosed since the subject went missing, newest first.
           const { data: trades, error } = await supabase
             .from("congress_trades")
             .select("id, ticker, amount, transaction_type, transaction_date, ret_since")
             .eq("bioguide_id", bioguide)
+            .gte("transaction_date", MISSING_SINCE_DATE)
             .order("transaction_date", { ascending: false })
             .limit(200);
 
           if (error) throw error;
           if (!trades || trades.length === 0) {
-            setState("No disclosed trades on file.");
+            setState("No disclosed trades since March 5, 2026.");
             return;
           }
 
