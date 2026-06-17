@@ -1,0 +1,13 @@
+{
+  "name": "whereistomkean-og",
+  "private": true,
+  "type": "module",
+  "description": "Generates the 1200x630 social share card (og-image.png) for whereistomkean.org.",
+  "scripts": {
+    "build": "node render-og.mjs",
+    "postinstall": "playwright install chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}
