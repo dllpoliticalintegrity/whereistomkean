@@ -52,6 +52,13 @@
       rel="stylesheet"
     />
 
+    <!--
+      Givebutter donation widget loader (defines the <givebutter-widget> element).
+      The widget only renders once the account id is supplied on the script URL:
+      append ?acct=<16-char account id>&p=other  (from your Givebutter embed code).
+    -->
+    <script src="https://widgets.givebutter.com/latest.umd.cjs" async></script>
+
     <style>
       :root {
         --paper: #e4dccc;        /* desk */
@@ -427,12 +434,88 @@
         .cell .unit { letter-spacing: 0.1em; }
       }
 
+      /* ---------- Support modal ---------- */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(26, 22, 15, 0.62);
+        animation: pip-fade 0.2s ease both;
+      }
+      .modal-overlay[hidden] { display: none; }
+      @keyframes pip-fade { from { opacity: 0; } to { opacity: 1; } }
+
+      .modal {
+        position: relative;
+        width: 100%;
+        max-width: 460px;
+        max-height: 90vh;
+        overflow-y: auto;
+        background: var(--sheet);
+        border: 1px solid var(--ink);
+        border-top: 6px solid var(--alert);
+        padding: 30px 28px 26px;
+        box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.6);
+        animation: pip-rise 0.25s ease both;
+      }
+      @keyframes pip-rise {
+        from { transform: translateY(12px); opacity: 0; }
+        to { transform: none; opacity: 1; }
+      }
+      .modal-close {
+        position: absolute;
+        top: 6px;
+        right: 12px;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        padding: 4px;
+        font-size: 26px;
+        line-height: 1;
+        color: var(--muted);
+        font-family: var(--sans);
+      }
+      .modal-close:hover { color: var(--ink); }
+      .modal-eyebrow {
+        margin: 0 0 10px;
+        font-family: var(--mono);
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--alert);
+      }
+      .modal-title {
+        margin: 0 0 12px;
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 23px;
+        line-height: 1.12;
+        letter-spacing: 0.01em;
+        text-transform: uppercase;
+      }
+      .modal-body {
+        margin: 0 0 18px;
+        font-size: 15px;
+        line-height: 1.55;
+        color: var(--soft-ink);
+      }
+      .modal-embed {
+        padding-top: 16px;
+        border-top: 1px solid var(--hair);
+      }
+
       /* ---------- Print ---------- */
       @media print {
         body { background: #fff; padding: 0; }
         .sheet { box-shadow: none; border: none; max-width: 100%; }
         .counter, .sec { break-inside: avoid; }
         a { color: var(--ink); text-decoration: none; border: 0; }
+        .modal-overlay { display: none !important; }
       }
     </style>
   </head>
@@ -546,6 +629,52 @@
         <span class="formno">Form OIA&#8209;7</span>
       </footer>
     </main>
+
+    <!-- Support appeal — appears 30s after load -->
+    <div class="modal-overlay" id="pip-modal" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pip-modal-title">
+        <button class="modal-close" id="pip-modal-close" type="button" aria-label="Close">&times;</button>
+        <p class="modal-eyebrow">Public Service Announcement</p>
+        <h2 class="modal-title" id="pip-modal-title">
+          Brought to you by the fine folks at the Political Integrity Project
+        </h2>
+        <p class="modal-body">
+          Help us hold corporate candidates accountable by supporting our work.
+        </p>
+        <div class="modal-embed">
+          <givebutter-widget id="gVA39L"></givebutter-widget>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Show the support appeal once per session, 30 seconds after load.
+      (function () {
+        var KEY = "pip_modal_seen";
+        var modal = document.getElementById("pip-modal");
+        var closeBtn = document.getElementById("pip-modal-close");
+        if (!modal || !closeBtn) return;
+
+        function close() {
+          modal.hidden = true;
+          try { sessionStorage.setItem(KEY, "1"); } catch (e) {}
+        }
+
+        var seen = false;
+        try { seen = !!sessionStorage.getItem(KEY); } catch (e) {}
+        if (!seen) {
+          setTimeout(function () { modal.hidden = false; }, 30000);
+        }
+
+        closeBtn.addEventListener("click", close);
+        modal.addEventListener("click", function (e) {
+          if (e.target === modal) close();
+        });
+        document.addEventListener("keydown", function (e) {
+          if (e.key === "Escape" && !modal.hidden) close();
+        });
+      })();
+    </script>
 
     <script type="module">
       import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
