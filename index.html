@@ -802,9 +802,9 @@
                   autocomplete="email" maxlength="254" placeholder="you@email.com" required />
               </div>
               <div class="tip-field">
-                <label for="tip-zip">ZIP code <span class="opt">· optional · adds a pin to the map</span></label>
+                <label for="tip-zip">ZIP code <span class="req">· required · adds a pin to the map</span></label>
                 <input id="tip-zip" name="zip" type="text" inputmode="numeric"
-                  autocomplete="postal-code" maxlength="5" pattern="\d{5}" placeholder="07090" />
+                  autocomplete="postal-code" maxlength="5" pattern="\d{5}" placeholder="07090" required />
                 <span class="tip-zip-hint" id="tip-zip-hint" aria-live="polite"></span>
               </div>
               <div class="tip-field">
@@ -1513,6 +1513,7 @@
         function errorText(code) {
           switch (code) {
             case "invalid-email": return "That doesn't look like a valid email — try again.";
+            case "zip-required": return "Enter your 5-digit ZIP code to submit a tip.";
             case "file-too-large": return "That file is over the 2 MB limit. Pick a smaller one.";
             case "file-type": return "Attachments must be an image or PDF.";
             case "turnstile": return "Couldn't verify the human-check. Refresh and try again.";
@@ -1544,6 +1545,12 @@
           const email = form.email.value.trim().toLowerCase();
           if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             setMsg("Enter a valid email so we can confirm we got your tip.", "err");
+            return;
+          }
+          const zipVal = form.zip.value.replace(/\D/g, "").slice(0, 5);
+          if (zipVal.length !== 5) {
+            setMsg("Enter your 5-digit ZIP code so we can put your tip on the map.", "err");
+            form.zip.focus();
             return;
           }
           const file = fileEl.files && fileEl.files[0];
