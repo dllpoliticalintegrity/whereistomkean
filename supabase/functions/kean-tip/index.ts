@@ -29,10 +29,9 @@
 // — and omit from/subject/html so every send inherits the LATEST published
 // version (edit + Publish in Resend, no redeploy).
 //
-// Template variables (Resend → tom-kean-tip):
-//   LOCATION — the town/ZIP the tipster reported. May be empty; give it a
-//              Resend fallback (e.g. "an undisclosed location") if your copy
-//              references it.
+// The template is sent with NO variables — the receipt does not include the
+// tipster's location. The `tom-kean-tip` template therefore must not require
+// any variables (any it declares must have Resend fallbacks).
 //
 // Required project secrets (Supabase → Edge Functions → Secrets):
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY  — injected automatically
@@ -256,9 +255,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Send the confirmation receipt. A delivery failure is logged but does not
-    // fail the submission — the tip is already safely recorded.
-    const delivery = await deliver(email, { LOCATION: placeLabel || zip || "" }, tipId);
+    // Send the confirmation receipt. We deliberately send NO template variables
+    // — the receipt does not include the tipster's location. A delivery failure
+    // is logged but does not fail the submission — the tip is already recorded.
+    const delivery = await deliver(email, {}, tipId);
     await admin
       .from("kean_tips")
       .update(
