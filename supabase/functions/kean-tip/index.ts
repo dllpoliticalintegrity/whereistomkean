@@ -14,10 +14,15 @@
 //
 // Request: multipart/form-data
 //   email                  (required)
-//   location               (optional — town or ZIP)
+//   zip                    (optional — 5-digit US ZIP; geocoded for the map)
 //   cf-turnstile-response   (required — Turnstile token)
 //   website                (honeypot — must be empty)
 //   file                   (optional — image/PDF, <= 2 MB)
+//
+// A valid ZIP is geocoded server-side (zip_geo cache → Zippopotam → cache
+// write, the same path the Donor Strike uses) and the resulting ZIP-centroid
+// point is written to the public `kean_tip_map` table that feeds the homepage
+// map. The private `kean_tips` row keeps the full record.
 //
 // Email copy/design lives entirely in Resend as the published template
 // `tom-kean-tip`. We send by template reference — `template: { id, variables }`
@@ -118,7 +123,8 @@ Deno.serve(async (req) => {
 
     const email = sanitize(form.get("email"), 254).toLowerCase();
     if (!emailOk(email)) return json({ error: "invalid-email" }, 400);
-    const location = sanitize(form.get("location"), 120) || null;
+    // ZIP: keep digits only, first 5. Empty/!5-digit → no geocode, no map dot.
+    const zip = sanitize(form.get("zip"), 10).replace(/[^0-9]/g, "").slice(0, 5);
 
     // Caller IP (used for Turnstile remoteip + audit trail).
     const ip =
@@ -175,11 +181,21 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Authoritative server-side geocode of the ZIP (client-supplied coords are
+    // never trusted). Null when no/invalid ZIP or the lookup fails.
+    const geo = zip ? await geocodeZip(admin, zip) : null;
+    const placeLabel = geo ? [geo.city, geo.region].filter(Boolean).join(", ") : null;
+
     const { data: inserted, error: insErr } = await admin
       .from("kean_tips")
       .insert({
         email,
-        location,
+        location: placeLabel || (zip || null),
+        zip: zip || null,
+        city: geo?.city ?? null,
+        region: geo?.region ?? null,
+        lat: geo?.lat ?? null,
+        lng: geo?.lng ?? null,
         attachment_path: attachment?.path ?? null,
         attachment_name: attachment?.name ?? null,
         attachment_type: attachment?.type ?? null,
@@ -196,9 +212,50 @@ Deno.serve(async (req) => {
     }
     const tipId = (inserted as { id: number }).id;
 
+    // Drop a public-safe point on the map (no email / tip id) when we have
+    // coords. Best-effort: a map hiccup must not fail the tip. We return the
+    // new row's id + created_at so the client can drop the pin optimistically
+    // and de-dupe it against the poll.
+    let mapPoint:
+      | {
+          id: number;
+          lat: number;
+          lng: number;
+          city: string | null;
+          region: string | null;
+          created_at: string;
+        }
+      | null = null;
+    if (geo && geo.lat != null && geo.lng != null) {
+      const { data: mapRow, error: mapErr } = await admin
+        .from("kean_tip_map")
+        .insert({
+          city: geo.city,
+          region: geo.region,
+          country: geo.country,
+          lat: geo.lat,
+          lng: geo.lng,
+        })
+        .select("id, created_at")
+        .single();
+      if (mapErr || !mapRow) {
+        console.error("kean-tip: map insert failed", mapErr?.message);
+      } else {
+        const row = mapRow as { id: number; created_at: string };
+        mapPoint = {
+          id: row.id,
+          lat: geo.lat,
+          lng: geo.lng,
+          city: geo.city,
+          region: geo.region,
+          created_at: row.created_at,
+        };
+      }
+    }
+
     // Send the confirmation receipt. A delivery failure is logged but does not
     // fail the submission — the tip is already safely recorded.
-    const delivery = await deliver(email, { LOCATION: location ?? "" }, tipId);
+    const delivery = await deliver(email, { LOCATION: placeLabel || zip || "" }, tipId);
     await admin
       .from("kean_tips")
       .update(
@@ -208,12 +265,100 @@ Deno.serve(async (req) => {
       )
       .eq("id", tipId);
 
-    return json({ ok: true });
+    return json({ ok: true, point: mapPoint });
   } catch (err) {
     console.error("kean-tip error", err);
     return json({ error: "server" }, 500);
   }
 });
+
+// ---------------- ZIP geocode ----------------
+interface Geo {
+  lat: number | null;
+  lng: number | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+}
+
+const numOk = (v: unknown): number | null =>
+  typeof v === "number" && Number.isFinite(v) ? v : null;
+
+// ZIP → lat/lng. Reads the shared public.zip_geo cache first (built up across
+// both sites), falls back to Zippopotam with a short timeout, and writes the
+// result back to the cache. Mirrors the Donor Strike's lookupZipCached.
+async function geocodeZip(admin: SupabaseClient, zip: string): Promise<Geo | null> {
+  const z = zip.slice(0, 5);
+  if (!/^\d{5}$/.test(z)) return null;
+
+  try {
+    const { data: hit } = await admin
+      .from("zip_geo")
+      .select("zip, lat, lng, city, region")
+      .eq("zip", z)
+      .maybeSingle();
+    if (hit) {
+      return {
+        lat: numOk((hit as { lat: number }).lat),
+        lng: numOk((hit as { lng: number }).lng),
+        city: (hit as { city: string | null }).city ?? null,
+        region: (hit as { region: string | null }).region ?? null,
+        country: "United States",
+      };
+    }
+  } catch {
+    /* cache unavailable — fall through to upstream */
+  }
+
+  let up: Geo | null = null;
+  try {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 1500);
+    const res = await fetch(`https://api.zippopotam.us/us/${z}`, { signal: ctrl.signal });
+    clearTimeout(to);
+    if (res.ok) {
+      const j = (await res.json()) as {
+        country?: string;
+        places?: Array<{
+          latitude?: string;
+          longitude?: string;
+          "place name"?: string;
+          state?: string;
+        }>;
+      };
+      const place = j?.places?.[0];
+      if (place) {
+        const lat = numOk(parseFloat(place.latitude ?? ""));
+        const lng = numOk(parseFloat(place.longitude ?? ""));
+        if (lat != null && lng != null) {
+          up = {
+            lat,
+            lng,
+            city: place["place name"] ?? null,
+            region: place.state ?? null,
+            country: j.country ?? "United States",
+          };
+        }
+      }
+    }
+  } catch {
+    /* swallow — cache stays cold for this ZIP */
+  }
+
+  if (up) {
+    try {
+      await admin
+        .from("zip_geo")
+        .upsert(
+          { zip: z, lat: up.lat, lng: up.lng, city: up.city, region: up.region },
+          { onConflict: "zip" },
+        );
+    } catch {
+      /* ignore */
+    }
+  }
+  return up;
+}
 
 // ---------------- Turnstile ----------------
 async function verifyTurnstile(token: string, ip: string | null, secret: string): Promise<boolean> {

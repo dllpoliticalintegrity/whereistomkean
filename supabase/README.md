@@ -7,15 +7,25 @@ public anon key, **all secrets live in the `kean-tip` edge function**, never in
 the page — the same model the Donor Strike uses for signups.
 
 ```
-index.html (tip form)
-   │  POST multipart/form-data  (email, location, file, cf-turnstile-response)
+index.html (tip form + Leaflet map)
+   │  POST multipart/form-data  (email, zip, file, cf-turnstile-response)
    ▼
 kean-tip  edge function  (verify_jwt: false)
    ├─ verify Cloudflare Turnstile        (KEAN_TURNSTILE_SECRET)
+   ├─ geocode ZIP        → public.zip_geo cache → Zippopotam → cache write
    ├─ upload attachment → storage bucket `kean-tips` (private, service role)
-   ├─ insert row        → table  `public.kean_tips`  (service role)
-   └─ send receipt      → Resend template `tom-kean-tip` (RESEND_API_KEY)
+   ├─ insert full record → table  `public.kean_tips`     (service role, private)
+   ├─ insert map point   → table  `public.kean_tip_map`  (service role; public-read)
+   └─ send receipt       → Resend template `tom-kean-tip` (RESEND_API_KEY)
+
+index.html map  ──reads──▶  public.kean_tip_map  (anon SELECT; ZIP-centroid
+                                                  points only, no email/tip id)
 ```
+
+The map (Leaflet + markercluster, lazy-loaded from unpkg) reads `kean_tip_map`
+with the anon key — initial load + a 10s poll for new pins, and the submitter's
+own pin is dropped optimistically. ZIP → lat/lng reuses the shared
+`public.zip_geo` cache (created by the Donor Strike's launch-hardening.sql).
 
 ## Files
 
@@ -24,6 +34,8 @@ kean-tip  edge function  (verify_jwt: false)
   allow-list).
 - `migrations/20260618_kean_turnstile_secret_rpc.sql` — `kean_turnstile_secret()`
   RPC (service-role-only) that reads the Turnstile secret from Supabase Vault.
+- `migrations/20260618_kean_tip_map.sql` — geo columns on `kean_tips` + the
+  public-read `kean_tip_map` points table (anon SELECT only; service-role writes).
 - `functions/kean-tip/index.ts` — the edge function.
 
 All are already deployed to the **Integrity Index** project
