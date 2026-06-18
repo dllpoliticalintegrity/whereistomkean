@@ -20,11 +20,11 @@
 //   file                   (optional — image/PDF, <= 2 MB)
 //
 // Email copy/design lives entirely in Resend as the published template
-// `kean-tip`. We send by template reference — `template: { id, variables }` —
-// and omit from/subject/html so every send inherits the LATEST published
+// `tom-kean-tip`. We send by template reference — `template: { id, variables }`
+// — and omit from/subject/html so every send inherits the LATEST published
 // version (edit + Publish in Resend, no redeploy).
 //
-// Template variables (Resend → kean-tip):
+// Template variables (Resend → tom-kean-tip):
 //   LOCATION — the town/ZIP the tipster reported. May be empty; give it a
 //              Resend fallback (e.g. "an undisclosed location") if your copy
 //              references it.
@@ -62,7 +62,7 @@ async function resolveTurnstileSecret(admin: SupabaseClient): Promise<string> {
   return cachedTurnstileSecret;
 }
 
-const RESEND_TEMPLATE = "kean-tip";
+const RESEND_TEMPLATE = "tom-kean-tip";
 const BUCKET = "kean-tips";
 const MAX_BYTES = 2 * 1024 * 1024; // 2 MiB
 const ALLOWED_TYPES = new Set([

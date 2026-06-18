@@ -14,7 +14,7 @@ kean-tip  edge function  (verify_jwt: false)
    ├─ verify Cloudflare Turnstile        (KEAN_TURNSTILE_SECRET)
    ├─ upload attachment → storage bucket `kean-tips` (private, service role)
    ├─ insert row        → table  `public.kean_tips`  (service role)
-   └─ send receipt      → Resend template `kean-tip` (RESEND_API_KEY)
+   └─ send receipt      → Resend template `tom-kean-tip` (RESEND_API_KEY)
 ```
 
 ## Files
@@ -38,11 +38,12 @@ All are already deployed to the **Integrity Index** project
     `KEAN_TURNSTILE_SECRET` env secret would override the Vault path.
   - Verified live: a bogus token is rejected with `{"error":"turnstile"}` (400).
 - ✅ **RESEND_API_KEY** — already present (shared with `strike-welcome`).
-- ⏳ **Resend template** — still TODO: create and **Publish** a template with
-  alias `kean-tip`. Declare one variable, `LOCATION` (Text), with a fallback
-  (e.g. "an undisclosed location") since it can be empty. The function sends by
-  reference and omits from/subject/html, so the latest published version is
-  always used — no redeploy to change copy.
+- ⏳ **Resend template** — still TODO: create and **Publish** a template whose
+  **alias/slug is `tom-kean-tip`** (display name can be "Tom Kean Tip"). Declare
+  one variable, `LOCATION` (Text), with a fallback (e.g. "an undisclosed
+  location") since it can be empty. The function sends by reference and omits
+  from/subject/html, so the latest published version is always used — no
+  redeploy to change copy.
 
 Until the Resend template exists, tips are still **stored** correctly; only the
 confirmation email fails, and the failure is recorded in
