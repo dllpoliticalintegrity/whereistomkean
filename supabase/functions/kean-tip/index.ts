@@ -14,7 +14,7 @@
 //
 // Request: multipart/form-data
 //   email                  (required)
-//   zip                    (optional — 5-digit US ZIP; geocoded for the map)
+//   zip                    (required — 5-digit US ZIP; geocoded for the map)
 //   cf-turnstile-response   (required — Turnstile token)
 //   website                (honeypot — must be empty)
 //   file                   (optional — image/PDF, <= 2 MB)
@@ -123,8 +123,11 @@ Deno.serve(async (req) => {
 
     const email = sanitize(form.get("email"), 254).toLowerCase();
     if (!emailOk(email)) return json({ error: "invalid-email" }, 400);
-    // ZIP: keep digits only, first 5. Empty/!5-digit → no geocode, no map dot.
+    // ZIP is required. Keep digits only, first 5; reject if not a full 5-digit
+    // ZIP. (A valid-format ZIP that fails to geocode is still accepted — we
+    // don't punish the user for an upstream lookup hiccup, it just gets no pin.)
     const zip = sanitize(form.get("zip"), 10).replace(/[^0-9]/g, "").slice(0, 5);
+    if (zip.length !== 5) return json({ error: "zip-required" }, 400);
 
     // Caller IP (used for Turnstile remoteip + audit trail).
     const ip =
@@ -182,7 +185,7 @@ Deno.serve(async (req) => {
     }
 
     // Authoritative server-side geocode of the ZIP (client-supplied coords are
-    // never trusted). Null when no/invalid ZIP or the lookup fails.
+    // never trusted). Null when the lookup fails (still accepted, just no pin).
     const geo = zip ? await geocodeZip(admin, zip) : null;
     const placeLabel = geo ? [geo.city, geo.region].filter(Boolean).join(", ") : null;
 
