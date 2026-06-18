@@ -404,6 +404,79 @@
       .tipline a { font-weight: 600; text-decoration: none; border-bottom: 1px solid currentColor; padding-bottom: 1px; }
       .tipline a:hover { color: var(--ink); }
 
+      /* ---------- Tip line form ---------- */
+      .tip-form { margin-top: 18px; display: grid; gap: 14px; }
+      .tip-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+      .tip-field { display: grid; gap: 5px; }
+      .tip-field label {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .tip-field label .req { color: var(--alert); }
+      .tip-field label .opt { color: var(--rule); }
+      .tip-field input[type="email"],
+      .tip-field input[type="text"] {
+        font-family: var(--mono);
+        font-size: 14px;
+        color: var(--ink);
+        background: #fff;
+        border: 1px solid var(--ink);
+        padding: 10px 12px;
+        width: 100%;
+      }
+      .tip-field input[type="file"] { font-family: var(--mono); font-size: 12px; color: var(--soft-ink); }
+      .tip-field input::placeholder { color: var(--rule); }
+      .tip-turnstile:empty { display: none; }
+      .tip-submit {
+        justify-self: start;
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 15px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--sheet);
+        background: var(--alert);
+        border: 1px solid var(--ink);
+        padding: 11px 22px;
+        cursor: pointer;
+      }
+      .tip-submit:hover { background: var(--ink); }
+      .tip-submit:disabled { opacity: 0.55; cursor: default; }
+      .tip-msg { font-family: var(--mono); font-size: 12.5px; line-height: 1.5; }
+      .tip-msg.err { color: var(--alert); }
+      .tip-msg.ok { color: var(--green); }
+      .tip-received {
+        margin-top: 18px;
+        border: 1px solid var(--green);
+        border-left: 4px solid var(--green);
+        padding: 16px 18px;
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--soft-ink);
+      }
+      .tip-received b {
+        display: block;
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 15px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--green);
+        margin-bottom: 6px;
+      }
+      .tip-or {
+        margin: 22px 0 0;
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
       footer {
         padding: 20px 24px 24px;
         color: var(--muted);
@@ -642,8 +715,38 @@
             <h3>If You Have Information</h3>
             <p>
               If you have seen this congressman hosting an open, in-person town
-              hall, his constituents would like to know.
+              hall, his constituents would like to know. Submit a tip below and
+              we'll send a confirmation to your email.
             </p>
+
+            <form class="tip-form" id="tip-form" novalidate>
+              <!-- Honeypot — hidden from people, often filled by bots. -->
+              <div class="tip-hp" aria-hidden="true">
+                <label>Website
+                  <input type="text" name="website" tabindex="-1" autocomplete="off" />
+                </label>
+              </div>
+              <div class="tip-field">
+                <label for="tip-email">Email <span class="req">· required</span></label>
+                <input id="tip-email" name="email" type="email" inputmode="email"
+                  autocomplete="email" maxlength="254" placeholder="you@email.com" required />
+              </div>
+              <div class="tip-field">
+                <label for="tip-location">Location <span class="opt">· optional</span></label>
+                <input id="tip-location" name="location" type="text" maxlength="120"
+                  placeholder="Town or ZIP where you saw him" />
+              </div>
+              <div class="tip-field">
+                <label for="tip-file">Photo or document <span class="opt">· optional · 2 MB max</span></label>
+                <input id="tip-file" name="file" type="file"
+                  accept="image/png,image/jpeg,image/webp,image/heic,image/heif,application/pdf" />
+              </div>
+              <div class="tip-turnstile" id="tip-turnstile"></div>
+              <button class="tip-submit" type="submit">Submit Tip</button>
+              <div class="tip-msg" id="tip-msg" role="status" aria-live="polite"></div>
+            </form>
+
+            <p class="tip-or">Or reach the office directly</p>
             <div class="contacts" id="contacts">
               <a href="https://integrityindex.us/candidate/thomas-kean" target="_blank" rel="noopener">View full case file</a>
             </div>
@@ -735,6 +838,19 @@
       // Who we're tracking.
       const CANDIDATE_SLUG = "thomas-kean";
       const CANDIDATE_BIOGUIDE = "K000398";
+
+      /* ---- Tip line ----
+       * The tip form posts to the `kean-tip` Supabase edge function, which
+       * verifies Turnstile, stores the tip (+ optional ≤2 MB attachment), and
+       * emails a confirmation via the Resend `kean-tip` template. All secrets
+       * live in the edge function — the page only needs the PUBLIC site key.
+       *
+       * TODO before launch: create a Cloudflare Turnstile widget for
+       * whereistomkean.org, paste its SITE key below, and set the matching
+       * SECRET in Supabase as `KEAN_TURNSTILE_SECRET`. */
+      const TURNSTILE_SITE_KEY = "REPLACE_WITH_WHEREISTOMKEAN_TURNSTILE_SITE_KEY";
+      const TIP_ENDPOINT = `${SUPABASE_URL}/functions/v1/kean-tip`;
+      const TIP_MAX_BYTES = 2 * 1024 * 1024; // 2 MiB
 
       const esc = (s) =>
         String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -1020,6 +1136,139 @@
       }
 
       load();
+
+      /* ---------------- Tip line form ---------------- */
+      function loadTurnstile() {
+        return new Promise((resolve, reject) => {
+          if (window.turnstile) return resolve();
+          const src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+          const existing = document.querySelector(`script[src="${src}"]`);
+          if (existing) {
+            existing.addEventListener("load", () => resolve(), { once: true });
+            return;
+          }
+          const s = document.createElement("script");
+          s.src = src;
+          s.async = true;
+          s.defer = true;
+          s.onload = () => resolve();
+          s.onerror = () => reject(new Error("turnstile-failed"));
+          document.head.appendChild(s);
+        });
+      }
+
+      function initTipForm() {
+        const form = document.getElementById("tip-form");
+        if (!form) return;
+        const msgEl = document.getElementById("tip-msg");
+        const fileEl = document.getElementById("tip-file");
+        const submitBtn = form.querySelector(".tip-submit");
+        const tsEl = document.getElementById("tip-turnstile");
+        const renderedAt = Date.now();
+        let widgetId = null;
+        let token = "";
+
+        const keyMissing = !TURNSTILE_SITE_KEY || TURNSTILE_SITE_KEY.startsWith("REPLACE_");
+        if (keyMissing) {
+          console.warn("Tip form: TURNSTILE_SITE_KEY is not configured — set it in the Config block.");
+        } else {
+          loadTurnstile()
+            .then(() => {
+              if (!window.turnstile || widgetId !== null) return;
+              widgetId = window.turnstile.render(tsEl, {
+                sitekey: TURNSTILE_SITE_KEY,
+                theme: "light",
+                callback: (t) => { token = t; },
+                "expired-callback": () => { token = ""; },
+                "error-callback": () => { token = ""; },
+              });
+            })
+            .catch(() => {});
+        }
+
+        function setMsg(text, kind) {
+          msgEl.textContent = text || "";
+          msgEl.className = "tip-msg" + (kind ? " " + kind : "");
+        }
+        function resetTurnstile() {
+          token = "";
+          try {
+            if (widgetId !== null && window.turnstile) window.turnstile.reset(widgetId);
+          } catch (e) { /* ignore */ }
+        }
+        function errorText(code) {
+          switch (code) {
+            case "invalid-email": return "That doesn't look like a valid email — try again.";
+            case "file-too-large": return "That file is over the 2 MB limit. Pick a smaller one.";
+            case "file-type": return "Attachments must be an image or PDF.";
+            case "turnstile": return "Couldn't verify the human-check. Refresh and try again.";
+            default: return "Something went wrong on our end. Please try again in a moment.";
+          }
+        }
+        function showReceived() {
+          const wrap = form.parentElement;
+          const done = document.createElement("div");
+          done.className = "tip-received";
+          done.innerHTML =
+            "<b>Tip received</b>Thank you. We've logged your tip and sent a confirmation to " +
+            "your email. Check your inbox (and spam) for the receipt.";
+          form.replaceWith(done);
+        }
+
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          // Silent bot drops: honeypot filled, or submitted implausibly fast.
+          if (form.website.value.trim() !== "") { showReceived(); return; }
+          if (Date.now() - renderedAt < 1500) { showReceived(); return; }
+
+          const email = form.email.value.trim().toLowerCase();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            setMsg("Enter a valid email so we can confirm we got your tip.", "err");
+            return;
+          }
+          const file = fileEl.files && fileEl.files[0];
+          if (file && file.size > TIP_MAX_BYTES) {
+            setMsg("That file is over the 2 MB limit. Pick a smaller one.", "err");
+            return;
+          }
+          if (keyMissing) {
+            setMsg("The tip line isn't fully configured yet — please use the contacts below.", "err");
+            return;
+          }
+          if (!token) {
+            setMsg("Give the human-check a moment to finish, then submit again.", "err");
+            return;
+          }
+
+          submitBtn.disabled = true;
+          setMsg("Sending…", null);
+
+          const fd = new FormData();
+          fd.set("email", email);
+          fd.set("location", form.location.value.trim());
+          fd.set("cf-turnstile-response", token);
+          if (file) fd.set("file", file);
+
+          try {
+            const res = await fetch(TIP_ENDPOINT, {
+              method: "POST",
+              // No Content-Type: the browser sets the multipart boundary.
+              headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+              body: fd,
+            });
+            const out = await res.json().catch(() => ({}));
+            if (res.ok && out.ok) { showReceived(); return; }
+            submitBtn.disabled = false;
+            resetTurnstile();
+            setMsg(errorText(out.error), "err");
+          } catch (err) {
+            submitBtn.disabled = false;
+            resetTurnstile();
+            setMsg("Couldn't reach the tip line right now. Please try again in a moment.", "err");
+          }
+        });
+      }
+      initTipForm();
     </script>
   </body>
 </html>

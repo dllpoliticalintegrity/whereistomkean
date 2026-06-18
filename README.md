@@ -6,16 +6,22 @@ A standalone, single-page accountability site. It shows:
    **March 5, 2025** — Rep. Thomas Kean Jr.'s (NJ-07) last confirmed in-person town hall.
 2. **Every disclosed stock trade** he has made, pulled live from the same Supabase
    database that powers [Integrity Index](https://integrityindex.us), newest first.
+3. **A tip line** ("If You Have Information") where constituents submit a tip —
+   email, optional location, and an optional ≤2 MB photo/document — and get a
+   confirmation email back.
 
 The whole site is a single `index.html` — no build step, no framework, no
 dependencies. It talks directly to Supabase from the browser using the public
-anon key.
+anon key. The tip line posts to a Supabase **edge function** (`kean-tip`) so the
+page never holds any secret; see [`supabase/`](./supabase/) for that backend and
+its one-time setup (Resend template + Turnstile keys).
 
 Files (all at the repo root):
 
 - `index.html` — the entire site
 - `og-image.png` — 1200×630 social share card
 - `robots.txt`, `sitemap.xml` — crawlability
+- `supabase/` — tip-line backend (migration + `kean-tip` edge function)
 
 ## Run locally
 
