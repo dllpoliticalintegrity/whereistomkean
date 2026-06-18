@@ -33,14 +33,34 @@
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY  — injected automatically
 //   RESEND_API_KEY                           — already set (shared w/ strike-welcome)
 //   KEAN_TURNSTILE_SECRET                    — the SECRET for the whereistomkean.org
-//                                              Turnstile widget (NOT the donor-strike one)
+//                                              Turnstile widget (NOT the donor-strike one).
+//                                              If this env var is unset, the secret is
+//                                              read from Supabase Vault via the
+//                                              kean_turnstile_secret() RPC instead.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
-const TURNSTILE_SECRET = Deno.env.get("KEAN_TURNSTILE_SECRET")!;
+
+// Turnstile secret: prefer the KEAN_TURNSTILE_SECRET env var; otherwise fall
+// back to Supabase Vault via the kean_turnstile_secret() RPC (set there because
+// edge-function env secrets can't always be provisioned through tooling). The
+// resolved value is cached for the lifetime of the warm instance.
+let cachedTurnstileSecret: string | null = null;
+async function resolveTurnstileSecret(admin: SupabaseClient): Promise<string> {
+  const env = Deno.env.get("KEAN_TURNSTILE_SECRET");
+  if (env) return env;
+  if (cachedTurnstileSecret) return cachedTurnstileSecret;
+  const { data, error } = await admin.rpc("kean_turnstile_secret");
+  if (error || typeof data !== "string" || !data) {
+    console.error("kean-tip: could not resolve Turnstile secret from vault", error?.message);
+    return "";
+  }
+  cachedTurnstileSecret = data;
+  return cachedTurnstileSecret;
+}
 
 const RESEND_TEMPLATE = "kean-tip";
 const BUCKET = "kean-tips";
@@ -107,20 +127,21 @@ Deno.serve(async (req) => {
       null;
     const userAgent = sanitize(req.headers.get("user-agent"), 400) || null;
 
-    // Verify Turnstile. Fail closed if the secret isn't configured.
-    if (!TURNSTILE_SECRET) {
-      console.error("kean-tip: KEAN_TURNSTILE_SECRET not configured");
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE, {
+      auth: { persistSession: false },
+    });
+
+    // Verify Turnstile. Fail closed if no secret can be resolved (env or vault).
+    const turnstileSecret = await resolveTurnstileSecret(admin);
+    if (!turnstileSecret) {
+      console.error("kean-tip: Turnstile secret not configured (env or vault)");
       return json({ error: "turnstile-misconfigured" }, 500);
     }
     const token = sanitize(form.get("cf-turnstile-response"), 4096);
     if (!token) return json({ error: "turnstile" }, 400);
-    if (!(await verifyTurnstile(token, ip))) {
+    if (!(await verifyTurnstile(token, ip, turnstileSecret))) {
       return json({ error: "turnstile" }, 400);
     }
-
-    const admin = createClient(SUPABASE_URL, SERVICE_ROLE, {
-      auth: { persistSession: false },
-    });
 
     // Optional attachment.
     let attachment:
@@ -195,10 +216,10 @@ Deno.serve(async (req) => {
 });
 
 // ---------------- Turnstile ----------------
-async function verifyTurnstile(token: string, ip: string | null): Promise<boolean> {
+async function verifyTurnstile(token: string, ip: string | null, secret: string): Promise<boolean> {
   try {
     const body = new URLSearchParams();
-    body.set("secret", TURNSTILE_SECRET);
+    body.set("secret", secret);
     body.set("response", token);
     if (ip) body.set("remoteip", ip);
     const res = await fetch(

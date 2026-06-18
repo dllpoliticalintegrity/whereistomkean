@@ -22,30 +22,44 @@ kean-tip  edge function  (verify_jwt: false)
 - `migrations/20260618_kean_tips.sql` — `kean_tips` table (service-role-only,
   RLS on, no policies) + private `kean-tips` storage bucket (2 MB cap, image/PDF
   allow-list).
+- `migrations/20260618_kean_turnstile_secret_rpc.sql` — `kean_turnstile_secret()`
+  RPC (service-role-only) that reads the Turnstile secret from Supabase Vault.
 - `functions/kean-tip/index.ts` — the edge function.
 
-Both are already deployed to the **Integrity Index** project
+All are already deployed to the **Integrity Index** project
 (`qjsesvdduoriofiodumm`), shared with the Donor Strike and Integrity Index apps.
 
-## Remaining setup (one-time, before launch)
+## Setup status
 
-1. **Resend template** — create and **Publish** a template with alias
-   `kean-tip` in the Resend dashboard. Declare one variable, `LOCATION`
-   (Text), and give it a fallback (e.g. "an undisclosed location") since it can
-   be empty. The function sends by reference and omits from/subject/html, so
-   the latest published version is always used — no redeploy to change copy.
+- ✅ **Cloudflare Turnstile** — widget for `whereistomkean.org` is wired:
+  - site key is set in `TURNSTILE_SITE_KEY` in `index.html`;
+  - secret is stored in **Supabase Vault** (`kean_turnstile_secret`) and read by
+    the function via the `kean_turnstile_secret()` RPC. Setting a
+    `KEAN_TURNSTILE_SECRET` env secret would override the Vault path.
+  - Verified live: a bogus token is rejected with `{"error":"turnstile"}` (400).
+- ✅ **RESEND_API_KEY** — already present (shared with `strike-welcome`).
+- ⏳ **Resend template** — still TODO: create and **Publish** a template with
+  alias `kean-tip`. Declare one variable, `LOCATION` (Text), with a fallback
+  (e.g. "an undisclosed location") since it can be empty. The function sends by
+  reference and omits from/subject/html, so the latest published version is
+  always used — no redeploy to change copy.
 
-2. **Cloudflare Turnstile** — create a Turnstile widget whose domain list
-   includes `whereistomkean.org` (do **not** reuse the donor-strike widget).
-   - Paste the **site key** into `TURNSTILE_SITE_KEY` in `index.html`.
-   - Set the **secret key** in Supabase → Edge Functions → Secrets as
-     `KEAN_TURNSTILE_SECRET`.
+Until the Resend template exists, tips are still **stored** correctly; only the
+confirmation email fails, and the failure is recorded in
+`kean_tips.confirmation_error` (the user-facing submit still succeeds).
 
-3. **RESEND_API_KEY** — already present in the project (shared with
-   `strike-welcome`). No action unless it's rotated.
+### Rotating the Turnstile secret
 
-Until steps 1–2 are done the form renders but submission is blocked client-side
-(missing site key) and would be rejected server-side (missing secret / template).
+Since the secret was provisioned via Vault, rotate with:
+
+```sql
+select vault.update_secret(
+  (select id from vault.secrets where name = 'kean_turnstile_secret'),
+  '<new secret>', 'kean_turnstile_secret');
+```
+
+(or set a `KEAN_TURNSTILE_SECRET` env secret, which takes precedence). Generate
+the matching new secret in the Cloudflare Turnstile dashboard.
 
 ## Where tips land
 
