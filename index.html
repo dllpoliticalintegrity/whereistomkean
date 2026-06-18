@@ -477,6 +477,76 @@
         color: var(--muted);
       }
 
+      /* ---------- ZIP live hint ---------- */
+      .tip-zip-hint { font-family: var(--mono); font-size: 11px; color: var(--green); min-height: 14px; }
+      .tip-zip-hint.err { color: var(--alert); }
+
+      /* ---------- Tip map ---------- */
+      .map-frame {
+        position: relative;
+        margin-top: 14px;
+        border: 1px solid var(--ink);
+        background: var(--sheet);
+        box-shadow: 3px 3px 0 var(--hair);
+      }
+      #tip-map { width: 100%; height: 440px; background: var(--paper); }
+      @media (max-width: 640px) { #tip-map { height: 340px; } }
+      .map-frame .leaflet-container { font-family: var(--mono); background: var(--paper); }
+      .map-frame .leaflet-control-attribution {
+        background: rgba(252, 250, 243, 0.85);
+        color: var(--muted);
+        font-size: 9px;
+      }
+      .map-frame .leaflet-bar a {
+        background: var(--sheet);
+        color: var(--ink);
+        border-color: var(--rule);
+      }
+      .strike-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--alert);
+        border: 1.5px solid var(--sheet);
+        box-shadow: 0 0 0 1px var(--alert), 0 1px 3px rgba(0, 0, 0, 0.35);
+      }
+      .strike-dot.fresh { animation: dotpop 0.5s ease-out; }
+      @keyframes dotpop {
+        0% { transform: scale(0); }
+        60% { transform: scale(1.5); }
+        100% { transform: scale(1); }
+      }
+      .map-frame .marker-cluster-small,
+      .map-frame .marker-cluster-medium,
+      .map-frame .marker-cluster-large { background: rgba(179, 38, 25, 0.25); }
+      .map-frame .marker-cluster-small div,
+      .map-frame .marker-cluster-medium div,
+      .map-frame .marker-cluster-large div {
+        background: var(--alert);
+        color: var(--sheet);
+        font-family: var(--mono);
+        font-weight: 600;
+        font-size: 11px;
+      }
+      .map-empty {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        z-index: 500;
+      }
+      .map-empty span {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--soft-ink);
+        background: rgba(252, 250, 243, 0.92);
+        border: 1px solid var(--rule);
+        padding: 8px 14px;
+      }
+      .map-empty.hidden { display: none; }
+
       footer {
         padding: 20px 24px 24px;
         color: var(--muted);
@@ -732,9 +802,10 @@
                   autocomplete="email" maxlength="254" placeholder="you@email.com" required />
               </div>
               <div class="tip-field">
-                <label for="tip-location">Location <span class="opt">· optional</span></label>
-                <input id="tip-location" name="location" type="text" maxlength="120"
-                  placeholder="Town or ZIP where you saw him" />
+                <label for="tip-zip">ZIP code <span class="opt">· optional · adds a pin to the map</span></label>
+                <input id="tip-zip" name="zip" type="text" inputmode="numeric"
+                  autocomplete="postal-code" maxlength="5" pattern="\d{5}" placeholder="07090" />
+                <span class="tip-zip-hint" id="tip-zip-hint" aria-live="polite"></span>
               </div>
               <div class="tip-field">
                 <label for="tip-file">Photo or document <span class="opt">· optional · 2 MB max</span></label>
@@ -749,6 +820,20 @@
             <p class="tip-or">Or reach the office directly</p>
             <div class="contacts" id="contacts">
               <a href="https://integrityindex.us/candidate/thomas-kean" target="_blank" rel="noopener">View full case file</a>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec">
+          <h2 class="sec-h"><span class="no">05</span> Constituents Reporting In</h2>
+          <p class="note">
+            Every pin marks a ZIP code where someone has filed a tip. Add yours
+            using the form above.
+          </p>
+          <div class="map-frame" id="tip-map-frame">
+            <div id="tip-map"></div>
+            <div class="map-empty" id="tip-map-empty">
+              <span>No tips on the map yet — be the first pin.</span>
             </div>
           </div>
         </section>
@@ -851,6 +936,9 @@
       const TURNSTILE_SITE_KEY = "0x4AAAAAADnW49-UjiTqWnGX";
       const TIP_ENDPOINT = `${SUPABASE_URL}/functions/v1/kean-tip`;
       const TIP_MAX_BYTES = 2 * 1024 * 1024; // 2 MiB
+      // Public-safe map points (ZIP centroids only) written by the edge function.
+      const TIP_MAP_TABLE = "kean_tip_map";
+      const TIP_MAP_POLL_MS = 10_000;
 
       const esc = (s) =>
         String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -1157,6 +1245,208 @@
         });
       }
 
+      // Client-side ZIP → place lookup (keyless, CORS-friendly, cached by the
+      // browser). Authoritative geocode still happens server-side on submit.
+      async function lookupZip(zip) {
+        const z = String(zip || "").slice(0, 5);
+        if (!/^\d{5}$/.test(z)) return null;
+        try {
+          const res = await fetch(`https://api.zippopotam.us/us/${z}`, { cache: "force-cache" });
+          if (!res.ok) return null;
+          const j = await res.json();
+          const place = j && j.places && j.places[0];
+          if (!place) return null;
+          return {
+            city: place["place name"] || null,
+            region: place["state abbreviation"] || place["state"] || null,
+          };
+        } catch {
+          return null;
+        }
+      }
+
+      /* ---------------- Tip map (Leaflet, lazy-loaded) ---------------- */
+      const TipMap = (() => {
+        let L = null, map = null, cluster = null, initPromise = null, loaded = false;
+        const placed = new Set();
+        let latestCreatedAt = null;
+        const cols = "id,city,region,lat,lng,created_at";
+
+        function loadCss(href) {
+          if ([...document.querySelectorAll("link[rel=stylesheet]")].some((l) => l.href === href)) return;
+          const l = document.createElement("link");
+          l.rel = "stylesheet";
+          l.href = href;
+          document.head.appendChild(l);
+        }
+        function loadScript(src) {
+          return new Promise((res, rej) => {
+            const existing = [...document.scripts].find((s) => s.src === src);
+            if (existing) {
+              if (existing.dataset.loaded) return res();
+              existing.addEventListener("load", () => res(), { once: true });
+              existing.addEventListener("error", rej, { once: true });
+              return;
+            }
+            const s = document.createElement("script");
+            s.src = src;
+            s.async = true;
+            s.onload = () => { s.dataset.loaded = "1"; res(); };
+            s.onerror = rej;
+            document.head.appendChild(s);
+          });
+        }
+        async function loadLeaflet() {
+          if (window.L && window.L.markerClusterGroup) return window.L;
+          loadCss("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css");
+          loadCss("https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css");
+          loadCss("https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css");
+          await loadScript("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js");
+          await loadScript("https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js");
+          return window.L;
+        }
+        // deterministic jitter so stacked ZIP-centroid dots don't perfectly overlap
+        function jitter(lat, lng, seed) {
+          const s = Math.sin((seed || 0) * 9301 + 49297) * 233280;
+          const f = s - Math.floor(s);
+          return [lat + (f - 0.5) * 0.18, lng + (1 - f - 0.5) * 0.18];
+        }
+        function dotIcon(fresh) {
+          return L.divIcon({
+            className: "",
+            html: `<div class="strike-dot${fresh ? " fresh" : ""}"></div>`,
+            iconSize: [14, 14],
+            iconAnchor: [7, 7],
+          });
+        }
+        async function ensureMap() {
+          if (map) return map;
+          if (initPromise) return initPromise;
+          initPromise = (async () => {
+            L = await loadLeaflet();
+            const el = document.getElementById("tip-map");
+            const isMobile = window.innerWidth < 768;
+            map = L.map(el, {
+              scrollWheelZoom: false,
+              worldCopyJump: false,
+              zoomControl: true,
+              minZoom: 3,
+              maxBounds: L.latLngBounds([15, -180], [72, -60]),
+              maxBoundsViscosity: 1.0,
+            });
+            // Default view: New Jersey (NJ-07). Auto-reframes to the data on load.
+            map.setView([40.4, -74.5], isMobile ? 6 : 7);
+            map.on("click", () => map.scrollWheelZoom.enable());
+            L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
+              maxZoom: 18,
+              subdomains: "abcd",
+              noWrap: true,
+              bounds: L.latLngBounds([15, -180], [72, -60]),
+              attribution: "&copy; OpenStreetMap &copy; CARTO",
+            }).addTo(map);
+            cluster = L.markerClusterGroup({
+              disableClusteringAtZoom: 8,
+              showCoverageOnHover: false,
+              spiderfyOnMaxZoom: false,
+              chunkedLoading: true,
+              maxClusterRadius: 40,
+            });
+            map.addLayer(cluster);
+            return map;
+          })();
+          return initPromise;
+        }
+        function add(points, fresh) {
+          if (!L || !map || !cluster) return null;
+          const batch = [];
+          let bounds = null;
+          for (const p of points || []) {
+            if (!p || p.lat == null || p.lng == null) continue;
+            if (p.id != null) {
+              if (placed.has(p.id)) continue;
+              placed.add(p.id);
+            }
+            const [la, ln] = jitter(p.lat, p.lng, p.id || p.lat * 1000 + p.lng);
+            batch.push(
+              L.marker([la, ln], {
+                icon: dotIcon(fresh),
+                keyboard: false,
+                title: [p.city, p.region].filter(Boolean).join(", "),
+              }),
+            );
+            if (!bounds) bounds = L.latLngBounds([la, ln], [la, ln]);
+            else bounds.extend([la, ln]);
+            if (p.created_at && (!latestCreatedAt || p.created_at > latestCreatedAt)) {
+              latestCreatedAt = p.created_at;
+            }
+          }
+          if (batch.length) {
+            cluster.addLayers(batch);
+            const e = document.getElementById("tip-map-empty");
+            if (e) e.classList.add("hidden");
+          }
+          return bounds;
+        }
+        async function flyTo(lat, lng) {
+          await ensureMap();
+          map.flyTo([lat, lng], 9, { duration: 1.0 });
+        }
+        async function load() {
+          if (loaded) return;
+          loaded = true;
+          await ensureMap();
+          try {
+            const { data } = await supabase
+              .from(TIP_MAP_TABLE)
+              .select(cols)
+              .order("created_at", { ascending: false })
+              .limit(2000);
+            const bounds = add(data || [], false);
+            if (bounds && (data || []).length > 1) {
+              try { map.fitBounds(bounds, { padding: [30, 30], maxZoom: 9 }); } catch (e) { /* ignore */ }
+            }
+          } catch (e) {
+            /* degrade to the default empty map */
+          }
+          const tick = async () => {
+            try {
+              let q = supabase
+                .from(TIP_MAP_TABLE)
+                .select(cols)
+                .order("created_at", { ascending: false })
+                .limit(200);
+              if (latestCreatedAt) q = q.gt("created_at", latestCreatedAt);
+              const { data } = await q;
+              if (data && data.length) add(data, true);
+            } catch (e) {
+              /* ignore; retry next tick */
+            }
+            setTimeout(tick, TIP_MAP_POLL_MS);
+          };
+          setTimeout(tick, TIP_MAP_POLL_MS);
+        }
+        return { add, flyTo, load };
+      })();
+
+      // Only spin up Leaflet once the map scrolls near the viewport.
+      function initTipMap() {
+        const frame = document.getElementById("tip-map-frame");
+        if (!frame) return;
+        if ("IntersectionObserver" in window) {
+          const io = new IntersectionObserver(
+            (entries) => {
+              for (const en of entries) {
+                if (en.isIntersecting) { io.disconnect(); TipMap.load(); break; }
+              }
+            },
+            { rootMargin: "250px" },
+          );
+          io.observe(frame);
+        } else {
+          TipMap.load();
+        }
+      }
+
       function initTipForm() {
         const form = document.getElementById("tip-form");
         if (!form) return;
@@ -1186,6 +1476,30 @@
             .catch(() => {});
         }
 
+        // Live ZIP → "City, ST" hint (client-side, just for feedback; the edge
+        // function does the authoritative geocode on submit).
+        const zipEl = document.getElementById("tip-zip");
+        const zipHintEl = document.getElementById("tip-zip-hint");
+        if (zipEl && zipHintEl) {
+          let zipReq = 0;
+          zipEl.addEventListener("input", async () => {
+            const z = zipEl.value.replace(/\D/g, "").slice(0, 5);
+            if (zipEl.value !== z) zipEl.value = z;
+            zipHintEl.className = "tip-zip-hint";
+            if (z.length < 5) { zipHintEl.textContent = ""; return; }
+            const myReq = ++zipReq;
+            zipHintEl.textContent = "Looking up…";
+            const geo = await lookupZip(z);
+            if (myReq !== zipReq) return; // superseded by a newer keystroke
+            if (geo && geo.city) {
+              zipHintEl.textContent = "📍 " + [geo.city, geo.region].filter(Boolean).join(", ");
+            } else {
+              zipHintEl.textContent = "Couldn't find that ZIP — you can still submit.";
+              zipHintEl.className = "tip-zip-hint err";
+            }
+          });
+        }
+
         function setMsg(text, kind) {
           msgEl.textContent = text || "";
           msgEl.className = "tip-msg" + (kind ? " " + kind : "");
@@ -1205,13 +1519,19 @@
             default: return "Something went wrong on our end. Please try again in a moment.";
           }
         }
-        function showReceived() {
-          const wrap = form.parentElement;
+        function showReceived(point) {
+          // Drop the submitter's own pin immediately, and fly to it.
+          if (point && typeof point.lat === "number" && typeof point.lng === "number") {
+            TipMap.add([point], true);
+            TipMap.flyTo(point.lat, point.lng);
+          }
+          const onMap = point && point.lat != null;
           const done = document.createElement("div");
           done.className = "tip-received";
           done.innerHTML =
             "<b>Tip received</b>Thank you. We've logged your tip and sent a confirmation to " +
-            "your email. Check your inbox (and spam) for the receipt.";
+            "your email — check your inbox (and spam) for the receipt." +
+            (onMap ? " Your pin is now on the map below." : "");
           form.replaceWith(done);
         }
 
@@ -1245,7 +1565,7 @@
 
           const fd = new FormData();
           fd.set("email", email);
-          fd.set("location", form.location.value.trim());
+          fd.set("zip", form.zip.value.replace(/\D/g, "").slice(0, 5));
           fd.set("cf-turnstile-response", token);
           if (file) fd.set("file", file);
 
@@ -1257,7 +1577,7 @@
               body: fd,
             });
             const out = await res.json().catch(() => ({}));
-            if (res.ok && out.ok) { showReceived(); return; }
+            if (res.ok && out.ok) { showReceived(out.point); return; }
             submitBtn.disabled = false;
             resetTurnstile();
             setMsg(errorText(out.error), "err");
@@ -1269,6 +1589,7 @@
         });
       }
       initTipForm();
+      initTipMap();
     </script>
   </body>
 </html>
