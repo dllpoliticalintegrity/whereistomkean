@@ -16,7 +16,7 @@ kean-tip  edge function  (verify_jwt: false)
    ├─ upload attachment → storage bucket `kean-tips` (private, service role)
    ├─ insert full record → table  `public.kean_tips`     (service role, private)
    ├─ insert map point   → table  `public.kean_tip_map`  (service role; public-read)
-   └─ send receipt       → Resend template `tom-kean-tip` (RESEND_API_KEY)
+   └─ send receipt       → Resend template `tom-kean-template` (RESEND_API_KEY)
 
 index.html map  ──reads──▶  public.kean_tip_map  (anon SELECT; ZIP-centroid
                                                   points only, no email/tip id)
@@ -50,15 +50,14 @@ All are already deployed to the **Integrity Index** project
     `KEAN_TURNSTILE_SECRET` env secret would override the Vault path.
   - Verified live: a bogus token is rejected with `{"error":"turnstile"}` (400).
 - ✅ **RESEND_API_KEY** — already present (shared with `strike-welcome`).
-- ⏳ **Resend template** — still TODO: create and **Publish** a template whose
-  **alias/slug is `tom-kean-tip`** (display name can be "Tom Kean Tip"). Declare
-  one variable, `LOCATION` (Text), with a fallback (e.g. "an undisclosed
-  location") since it can be empty. The function sends by reference and omits
-  from/subject/html, so the latest published version is always used — no
-  redeploy to change copy.
+- ✅ **Resend template** — the function sends the published template whose
+  **alias/slug is `tom-kean-template`**. It is sent with **no variables**, so
+  the template must not require any (any it declares need Resend fallbacks).
+  The function sends by reference and omits from/subject/html, so the latest
+  published version is always used — no redeploy to change copy.
 
-Until the Resend template exists, tips are still **stored** correctly; only the
-confirmation email fails, and the failure is recorded in
+If the template is ever missing/unpublished, tips are still **stored**
+correctly; only the confirmation email fails, and the reason is recorded in
 `kean_tips.confirmation_error` (the user-facing submit still succeeds).
 
 ### Rotating the Turnstile secret

@@ -25,12 +25,12 @@
 // map. The private `kean_tips` row keeps the full record.
 //
 // Email copy/design lives entirely in Resend as the published template
-// `tom-kean-tip`. We send by template reference — `template: { id, variables }`
+// `tom-kean-template`. We send by template reference — `template: { id, variables }`
 // — and omit from/subject/html so every send inherits the LATEST published
 // version (edit + Publish in Resend, no redeploy).
 //
 // The template is sent with NO variables — the receipt does not include the
-// tipster's location. The `tom-kean-tip` template therefore must not require
+// tipster's location. The `tom-kean-template` template therefore must not require
 // any variables (any it declares must have Resend fallbacks).
 //
 // Required project secrets (Supabase → Edge Functions → Secrets):
@@ -66,7 +66,7 @@ async function resolveTurnstileSecret(admin: SupabaseClient): Promise<string> {
   return cachedTurnstileSecret;
 }
 
-const RESEND_TEMPLATE = "tom-kean-tip";
+const RESEND_TEMPLATE = "tom-kean-template";
 const BUCKET = "kean-tips";
 const MAX_BYTES = 2 * 1024 * 1024; // 2 MiB
 const ALLOWED_TYPES = new Set([
